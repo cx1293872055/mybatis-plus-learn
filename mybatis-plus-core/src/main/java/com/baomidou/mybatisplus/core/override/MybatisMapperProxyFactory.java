@@ -24,13 +24,6 @@ import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * <p>从 {@link MapperProxyFactory} copy 过来 </p>
- * <li> 使用 MybatisMapperMethod </li>
- *
- * @author miemie
- * @since 2018-06-09
- */
 public class MybatisMapperProxyFactory<T> {
 
     @Getter

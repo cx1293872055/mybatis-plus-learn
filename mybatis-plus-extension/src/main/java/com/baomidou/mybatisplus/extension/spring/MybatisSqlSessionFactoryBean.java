@@ -15,15 +15,18 @@
  */
 package com.baomidou.mybatisplus.extension.spring;
 
-import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.MybatisPlusVersion;
-import com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder;
-import com.baomidou.mybatisplus.core.MybatisXMLConfigBuilder;
+import com.baomidou.mybatisplus.core.*;
 import com.baomidou.mybatisplus.core.config.GlobalConfig;
+import com.baomidou.mybatisplus.core.override.MybatisMapperProxy;
+import com.baomidou.mybatisplus.core.override.MybatisMapperProxyFactory;
 import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
 import com.baomidou.mybatisplus.extension.toolkit.SqlRunner;
 import lombok.Setter;
+import org.apache.ibatis.binding.MapperProxy;
+import org.apache.ibatis.binding.MapperProxyFactory;
+import org.apache.ibatis.binding.MapperRegistry;
+import org.apache.ibatis.builder.annotation.MapperAnnotationBuilder;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.cache.Cache;
 import org.apache.ibatis.executor.ErrorContext;
@@ -36,12 +39,15 @@ import org.apache.ibatis.reflection.factory.ObjectFactory;
 import org.apache.ibatis.reflection.wrapper.ObjectWrapperFactory;
 import org.apache.ibatis.scripting.LanguageDriver;
 import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.transaction.TransactionFactory;
 import org.apache.ibatis.type.TypeHandler;
 import org.mybatis.logging.Logger;
 import org.mybatis.logging.LoggerFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.mapper.MapperFactoryBean;
 import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
@@ -55,6 +61,7 @@ import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.core.type.ClassMetadata;
 import org.springframework.core.type.classreading.CachingMetadataReaderFactory;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
+import org.springframework.dao.support.DaoSupport;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.util.ClassUtils;
 
@@ -457,10 +464,16 @@ public class MybatisSqlSessionFactoryBean implements FactoryBean<SqlSessionFacto
      */
     protected SqlSessionFactory buildSqlSessionFactory() throws Exception {
 
+        /**
+         * 直接看
+         * com/baomidou/mybatisplus/extension/spring/MybatisSqlSessionFactoryBean.java:565
+         */
         final Configuration targetConfiguration;
 
         // TODO 使用 MybatisXmlConfigBuilder 而不是 XMLConfigBuilder
         MybatisXMLConfigBuilder xmlConfigBuilder = null;
+        // 判断是否传入Configuration
+        // 如果有那么使用传入的Configuration
         if (this.configuration != null) {
             targetConfiguration = this.configuration;
             if (targetConfiguration.getVariables() == null) {
@@ -469,10 +482,14 @@ public class MybatisSqlSessionFactoryBean implements FactoryBean<SqlSessionFacto
                 targetConfiguration.getVariables().putAll(this.configurationProperties);
             }
         } else if (this.configLocation != null) {
+            // 如果没有传入Configuration
+            // 那么判断是否使用xml 配置方式
+            // 如果有那么解析xml文件为Configuration对象
             // TODO 使用 MybatisXMLConfigBuilder
             xmlConfigBuilder = new MybatisXMLConfigBuilder(this.configLocation.getInputStream(), null, this.configurationProperties);
             targetConfiguration = xmlConfigBuilder.getConfiguration();
         } else {
+            // 如果都没有那么使用mybatis默认配置类。
             LOGGER.debug(() -> "Property 'configuration' or 'configLocation' not specified, using default MyBatis Configuration");
             // TODO 使用 MybatisConfiguration
             targetConfiguration = new MybatisConfiguration();
@@ -559,6 +576,47 @@ public class MybatisSqlSessionFactoryBean implements FactoryBean<SqlSessionFacto
             this.transactionFactory == null ? new SpringManagedTransactionFactory() : this.transactionFactory,
             this.dataSource));
 
+
+        // 对配置Mapper.xml 文件路径 进行解析，扫描，处理
+        // 将按照扫描到的Mapper.xml 文件的namespace 进行mapper接口注册
+        // 并处理mapper.xml 中的sql 和mapper接口中方法的绑定
+        /**
+         * @see XMLMapperBuilder#parse()
+         * @see XMLMapperBuilder#bindMapperForNamespace()
+         *
+         * 能够看到是通过识别xml文件中的namespace 标签 来对mapper接口进行注册
+         */
+        // 如果mapper接口中没有对应mapper.xml文件
+        // 在MapperFactoryBean中有个方法会处理这种情况
+        /**
+         * @see DaoSupport#afterPropertiesSet()
+         * @see MapperFactoryBean#checkDaoConfig()
+         */
+        // 如果mapper接口没有对应的mapper.xml文件，
+        // 那么会在属性set完成的时候去检查并注册mapper接口到MybatisRegistrar中
+        // 在实例化 MapperFactoryBean
+        /**
+         * @see SqlSessionTemplate#getMapper(Class)
+         * @see MybatisConfiguration#getMapper(Class, SqlSession)
+         * @see MybatisMapperRegistry#getMapper(Class, SqlSession)
+         * @see MybatisMapperProxyFactory#newInstance(SqlSession)
+         * @see MybatisMapperProxyFactory#newInstance(MybatisMapperProxy)
+         */
+
+
+        // mybatis-plus 是在调用
+        /**
+         * @see MybatisMapperRegistry#addMapper(Class)
+         */
+        // 方法时对mapper做增强处理的
+
+
+        /**
+         * @see MybatisMapperAnnotationBuilder#parse()
+         *
+         * 重写了mybatis 的 MapperAnnotationBuilder.parse()
+         * 加入了常用方法的SQL注入
+         */
         if (this.mapperLocations != null) {
             if (this.mapperLocations.length == 0) {
                 LOGGER.warn(() -> "Property 'mapperLocations' was specified but matching resources are not found.");
